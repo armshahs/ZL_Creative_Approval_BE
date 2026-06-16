@@ -22,7 +22,7 @@ export const authenticateJWT = (
 
     // Make sure the decoded value matches the type
     // console.log(decoded);
-    req.user = decoded as { id: string; role: RoleType };
+    req.user = decoded as { id: string; role: RoleType; email: string };
     // console.log(req.user);
     next();
   });

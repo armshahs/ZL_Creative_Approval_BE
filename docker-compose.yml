@@ -1,0 +1,50 @@
+# version: "3.8"
+
+# services:
+#   bsd-saas-be:
+#     build:
+#       context: ./BSD_SaaS_BE
+#       dockerfile: Dockerfile
+#     container_name: bsd-saas-be
+#     image: bsd-saas-be-image
+#     restart: unless-stopped
+#     ports:
+#       - "8000:8000"
+#     env_file:
+#       - ./BSD_SaaS_BE/.env
+#     depends_on:
+#       - redis
+#     networks:
+#       - bsd-network
+
+#   bsd-saas-ai:
+#     build:
+#       context: ./BSD_SaaS_AI
+#       dockerfile: Dockerfile
+#     container_name: bsd-saas-ai
+#     image: bsd-saas-ai-image
+#     restart: unless-stopped
+#     ports:
+#       - "8001:8001"
+#     # env_file:
+#     #   - ./BSD_SaaS_AI/.env
+#     networks:
+#       - bsd-network
+
+#   # Redis for running job queues in bsd_saas_be
+#   redis:
+#     image: redis:7-alpine
+#     container_name: bsd-redis
+#     # command: redis-server --appendonly yes
+#     # Memory optimization for Redis using maxmemory and maxmemory-policy.
+#     # Note that allkeys-lru may accidently delete the new job if redis memory is full, but will not cause redis to crash.
+#     # command: redis-server --maxmemory 2gb --maxmemory-policy allkeys-lru
+#     ports:
+#       - "127.0.0.1:6379:6379" # so that only local connections are allowed, no one from outside can connect to the port.
+#     networks:
+#       - bsd-network
+#     restart: unless-stopped
+
+# networks:
+#   bsd-network:
+#     driver: bridge

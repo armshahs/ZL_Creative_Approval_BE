@@ -23,7 +23,9 @@ export const config = {
         : "src/database/migrations/**/*.ts",
     ], // Path to your migration files
     subscribers: [],
-    poolSize: 10, // Set a connection pool size
+    poolSize: 20, // Set a connection pool size
+    idleTimeoutMillis: 30000, // 30 seconds of inactivity before closing the connection
+    connectionTimeoutMillis: 5000, // 5 seconds to establish a connection
   },
   server: {
     port: parseInt(process.env.PORT || "3000", 10),
@@ -41,12 +43,18 @@ export const config = {
     jwtSecret: process.env.JWT_SECRET || "",
   },
   email: {
-    emailUser: process.env.EMAIL_USER || "",
-    emailPassword: process.env.EMAIL_PASSWORD || "",
-    emailClientUrl: process.env.EMAIL_CLIENT_URL || "",
+    emailUser: process.env.EMAIL_USER || "", // IGNORE - using gmail smtp server
+    emailPassword: process.env.EMAIL_PASSWORD || "", // IGNORE - using gmail smtp server
+    emailClientUrl: process.env.EMAIL_CLIENT_URL || "", // url for the email client
+    sendgridSenderEmail: process.env.SENDGRID_EMAIL_USER_VERIFIED || "", // sendgrid sender email verified
+    sendgridApiKey: process.env.SENDGRID_EMAIL_API_KEY || "", // sendgrid api key for sending emails
   },
-  currency: {
-    exchangeApiKey: process.env.CURRENCY_EXCHANGE_API_KEY || "",
-    exchangeApiUrlBase: process.env.CURRENCY_EXCHANGE_API_URL_BASE || "",
+  redis: {
+    host: process.env.REDIS_HOST || "localhost",
+    port: parseInt(process.env.REDIS_PORT || "6379"),
+    password: process.env.REDIS_PASSWORD,
+  },
+  slack: {
+    token: process.env.SLACK_TOKEN || "",
   },
 };

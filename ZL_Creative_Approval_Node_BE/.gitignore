@@ -128,3 +128,19 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# custom folders
+media_ai
+# data_uploads
+
+# markdown files
+SECURITY.md
+DEVELOPMENT_GUIDELINES.md
+
+# windsurf workflows
+.windsurf
+.codeiumignore
+
+# cursor files
+.cursorrules
+.cursor/

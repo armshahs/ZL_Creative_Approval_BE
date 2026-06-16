@@ -2,17 +2,79 @@ import express, { Request, Response } from "express";
 import helmet from "helmet";
 import cors from "cors";
 import compression from "compression";
+import rateLimit from "express-rate-limit";
 import { authRoutes, podRoutes, brandRoutes, currencyRoutes } from "./routes";
 // import { AppDataSource } from "./database";
 import { errorHandler } from "./middleware";
 import { EntityNotFoundError } from "./errors";
 import { logger } from "./utils";
+import { config } from "./config/config";
 
 const app = express();
 
 // Security middleware
 app.use(helmet());
-app.use(cors());
+
+// Enable CORS before rate limiting or else it will get blocked by rate limiting
+app.use(
+  cors({
+    origin:
+      config.server.nodeEnv === "production"
+        ? [
+            "http://170.64.134.212", // Production Frontend IP
+            "https://170.64.134.212", // Production Frontend IP
+            "http://analytics.bluesensedigital.com.au",
+            "https://analytics.bluesensedigital.com.au",
+            "http://www.analytics.bluesensedigital.com.au",
+            "https://www.analytics.bluesensedigital.com.au",
+            "http://localhost:3039",
+            "http://localhost:3000",
+          ]
+        : [
+            "http://localhost:3000",
+            "http://localhost:8000",
+            "http://localhost:8001",
+            "http://localhost:5173",
+            "http://localhost:8080",
+            "http://127.0.0.1:8000",
+            "http://localhost:80",
+            "http://localhost",
+            "http://localhost:3039",
+          ],
+    credentials: true, // Required if you're using cookies, sessions, or Authorization headers
+    methods: [
+      "GET",
+      "POST",
+      "PUT",
+      "PATCH",
+      "HEAD",
+      "DELETE",
+      "OPTIONS",
+      "TRACE",
+      "CONNECT",
+    ], // Methods to allow in the request
+    allowedHeaders: ["Content-Type", "Authorization", "X-Api-Key"], // Headers to allow in the request
+    exposedHeaders: [
+      "RateLimit-Limit",
+      "RateLimit-Remaining",
+      "RateLimit-Reset",
+    ], // Headers to expose in the response that can be read by the client
+  }),
+);
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 250, // Limit each IP to 250 requests per windowMs
+  message: "Too many requests from this IP, please try again after 1 minute",
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  skip: (req) => req.method === "OPTIONS", // needed because OPTIONS requests are used for CORS preflight
+});
+
+// Apply rate limiting to all routes
+app.use(limiter);
+
 app.use(compression());
 
 // JSON request body parsing

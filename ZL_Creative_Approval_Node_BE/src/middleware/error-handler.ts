@@ -1,6 +1,10 @@
 import { NextFunction, Request, Response } from "express";
 import { config } from "../config";
-import { getErrorMessage } from "../utils";
+import {
+  getErrorMessage,
+  getAppErrorInstanceFromGaxiosError,
+  isGaxiosError,
+} from "../utils";
 import { AppError } from "../errors/";
 
 // Default error handler for entire Nodejs app
@@ -8,7 +12,7 @@ export default function errorHandler(
   error: unknown,
   req: Request,
   res: Response,
-  next: NextFunction,
+  next: NextFunction
 ) {
   if (res.headersSent || config.server.debug) {
     next(error);
@@ -20,6 +24,17 @@ export default function errorHandler(
       error: {
         message: error.message,
         code: error.code,
+      },
+    });
+    return;
+  }
+
+  if (isGaxiosError(error)) {
+    const modifiedErrorObject = getAppErrorInstanceFromGaxiosError(error);
+    res.status(modifiedErrorObject.statusCode).json({
+      error: {
+        message: modifiedErrorObject.message,
+        code: modifiedErrorObject.code,
       },
     });
     return;
