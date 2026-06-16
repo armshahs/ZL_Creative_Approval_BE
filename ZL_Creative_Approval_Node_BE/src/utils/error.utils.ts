@@ -35,7 +35,7 @@ export class CustomError extends Error {
 
 // Function will return a CustomError instance when provided with a GAxiosError instance
 export function getCustomErrorInstanceFromGaxiosError(
-  error: GaxiosError
+  error: GaxiosError,
 ): CustomError {
   const errorStatus = error.response?.status || 500;
   let apiResponseMessage: string;
@@ -65,7 +65,7 @@ export function getCustomErrorInstanceFromGaxiosError(
 
 // Function will return a CustomError instance when provided with a GAxiosError instance
 export function getAppErrorInstanceFromGaxiosError(
-  error: GaxiosError
+  error: GaxiosError,
 ): AppError<string> {
   const errorStatus = error.response?.status || 500;
   let apiResponseMessage: string;
@@ -119,7 +119,7 @@ export type Result<T, E = CustomError> = Success<T> | Failure<E>;
 // Main Wrapper Function
 // Even if you don't provide the definition of T, E it will get inferred
 export async function tryCatch<T, E = CustomError>(
-  promise: Promise<T>
+  promise: Promise<T>,
 ): Promise<Result<T, E>> {
   try {
     const data = await promise;

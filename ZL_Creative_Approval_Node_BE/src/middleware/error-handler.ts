@@ -12,7 +12,7 @@ export default function errorHandler(
   error: unknown,
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) {
   if (res.headersSent || config.server.debug) {
     next(error);

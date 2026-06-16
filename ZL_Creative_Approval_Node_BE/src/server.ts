@@ -12,7 +12,7 @@ AppDataSource.initialize()
     // initializeCrons();
     // console.log("Crons started");
     app.listen(config.server.port, () =>
-      console.log(`Server running on port ${config.server.port}`)
+      console.log(`Server running on port ${config.server.port}`),
     );
     // Add logging
     logger.info(`Server running on port ${config.server.port}`);
