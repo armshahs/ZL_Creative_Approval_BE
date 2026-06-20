@@ -1,6 +1,24 @@
 import { Request } from "express";
-import { RoleType } from "../config";
+import { DashboardAccessRole } from "../config/constants";
+
+export interface PermissionsObject {
+  isSuperadmin: boolean;
+  adminWorkspaceIds: string[];
+  dashboardAccess: Record<string, DashboardAccessRole>;
+}
 
 export interface AuthRequest extends Request {
-  user?: { id: string; role: RoleType }; // Assuming `user` has at least an `id` field
+  userId?: string;
+  isSuperadmin?: boolean;
+  sessionFamilyId?: string;
+  permissions?: PermissionsObject;
+}
+
+export interface PublicUserProfile {
+  id: string;
+  email: string;
+  name: string;
+  status: string;
+  isSuperadmin: boolean;
+  mfaEnabled: boolean;
 }

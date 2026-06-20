@@ -1,11 +1,38 @@
 import jwt from "jsonwebtoken";
-import dotenv from "dotenv";
-import { config } from "../config";
+import { config } from "../config/config";
 
-dotenv.config();
+export interface AccessTokenPayload {
+  sub: string;
+  sid: string;
+  tv: number;
+  iat?: number;
+  exp?: number;
+}
 
-export const generateToken = (id: string, role: string) => {
-  return jwt.sign({ id, role }, config.auth.jwtSecret as string, {
-    expiresIn: "720h",
-  });
-};
+export class JwtUtil {
+  signAccessToken(payload: {
+    userId: string;
+    sessionFamilyId: string;
+    tokenVersion: number;
+  }): string {
+    return jwt.sign(
+      {
+        sub: payload.userId,
+        sid: payload.sessionFamilyId,
+        tv: payload.tokenVersion,
+      },
+      config.auth.jwtPrivateKey,
+      {
+        algorithm: "RS256",
+        expiresIn: config.auth.jwtAccessTtlSeconds,
+        keyid: config.auth.jwtKeyId,
+      },
+    );
+  }
+
+  verifyAccessToken(token: string): AccessTokenPayload {
+    return jwt.verify(token, config.auth.jwtPublicKey, {
+      algorithms: ["RS256"],
+    }) as AccessTokenPayload;
+  }
+}

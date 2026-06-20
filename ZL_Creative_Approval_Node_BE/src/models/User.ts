@@ -1,68 +1,38 @@
-import {
-  Entity,
-  // PrimaryGeneratedColumn,
-  Column,
-  // CreateDateColumn,
-  // UpdateDateColumn,
-  ManyToOne,
-  OneToMany,
-  JoinColumn,
-  Index,
-  ManyToMany,
-} from "typeorm";
-import { ROLES, RoleType } from "../config";
-import { Pod, Brand, BaseModel } from "../models";
+import { Entity, Column, Index } from "typeorm";
+import { BaseModel } from "./BaseModel";
+import { USER_STATUS, UserStatus } from "../config/constants";
 
-@Entity()
-@Index("idx_email", ["email"])
-@Index("idx_pod_id", ["pod"])
-@Index("idx_role", ["role"])
+@Entity("users")
+@Index("idx_users_email", ["email"])
 export class User extends BaseModel {
-  // @PrimaryGeneratedColumn("uuid")
-  // id!: string;
-
   @Column({ unique: true })
   email!: string;
 
   @Column()
-  name!: string;
+  passwordHash!: string;
 
   @Column()
-  password!: string;
+  name!: string;
+
+  @Column({
+    type: "enum",
+    enum: USER_STATUS,
+    default: USER_STATUS.ACTIVE,
+  })
+  status!: UserStatus;
 
   @Column({ nullable: true })
-  resetToken?: string;
+  resetToken?: string | null;
 
-  @Column({ type: "enum", enum: ROLES, default: ROLES.CLIENT })
-  role!: RoleType;
+  @Column({ default: false })
+  isSuperadmin!: boolean;
 
-  // Multiple users can be members of a single pod
-  // One User can belong to only one Pod as a member
-  @ManyToOne(() => Pod, (pod) => pod.members, {
-    onDelete: "SET NULL",
-    nullable: true,
-  })
-  @JoinColumn({ name: "pod_id" })
-  pod?: Pod | null;
+  @Column({ default: false })
+  mfaEnabled!: boolean;
 
-  // One User can lead multiple Pods
-  // Do not add "Pod[] | null" for onetomany or manytomany relations.
-  @OneToMany(() => Pod, (pod) => pod.podLeader, { nullable: true })
-  leadPods?: Pod[]; // If the user is a leader, link to the pod leader's pod
+  @Column({ nullable: true, select: false })
+  mfaSecretEncrypted?: string | null;
 
-  // Many users can have access to multiple brands (Optional). Here the user has access to these brands but may not be the assigned performance marketer.
-  @ManyToMany(() => Brand, (brand) => brand.members, { nullable: true })
-  brands?: Brand[];
-
-  // List of brands for the user is the assigned performance marketer.
-  @OneToMany(() => Brand, (brand) => brand.performanceMarketer, {
-    nullable: true,
-  })
-  performanceBrands?: Brand[];
-
-  // @CreateDateColumn()
-  // createdAt!: Date;
-
-  // @UpdateDateColumn()
-  // modifiedAt!: Date;
+  @Column({ type: "int", default: 0 })
+  tokenVersion!: number;
 }

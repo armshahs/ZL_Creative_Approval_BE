@@ -1,160 +1,255 @@
-import { AppDataSource } from "../database";
-import { In } from "typeorm";
-import { User, Brand } from "../models";
-import bcrypt from "bcryptjs";
-import { generateToken } from "../utils";
-import { sendResetEmail } from "../utils";
-import { ROLES, RoleType } from "../config";
-
-const userRepository = AppDataSource.getRepository(User);
-const brandRepository = AppDataSource.getRepository(Brand);
+import { Response } from "express";
+import { CookieOptions } from "express";
+import { config } from "../config/config";
+import { UserRepository, RefreshTokenRepository } from "../repositories";
+import { CryptoUtil } from "../utils/crypto.utils";
+import { JwtUtil } from "../utils/jwt.utils";
+import { EmailService } from "./email.service";
+import { USER_STATUS } from "../config/constants";
+import { PublicUserProfile } from "../interfaces/auth.interfaces";
+import { User } from "../models";
+import AppError from "../errors/custom-error";
 
 export class AuthService {
-  // SignUp --------------------------------------------------------
-  static async signUp(
+  constructor(
+    private readonly userRepository: UserRepository,
+    private readonly refreshTokenRepository: RefreshTokenRepository,
+    private readonly cryptoUtil: CryptoUtil,
+    private readonly jwtUtil: JwtUtil,
+    private readonly emailService: EmailService,
+  ) {}
+
+  private cookieOptions(): CookieOptions {
+    const isProduction = config.server.nodeEnv === "production";
+    return {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: "strict",
+      domain: config.auth.cookieDomain,
+      path: "/",
+      maxAge: config.auth.refreshTokenTtlDays * 24 * 60 * 60 * 1000,
+    };
+  }
+
+  private toPublicUser(user: User): PublicUserProfile {
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      status: user.status,
+      isSuperadmin: user.isSuperadmin,
+      mfaEnabled: user.mfaEnabled,
+    };
+  }
+
+  private async issueSession(
+    user: User,
+    res: Response,
+    familyId?: string,
+  ): Promise<{ accessToken: string; user: PublicUserProfile }> {
+    const sessionFamilyId = familyId ?? this.cryptoUtil.generateFamilyId();
+    const rawRefresh = this.cryptoUtil.generateOpaqueToken();
+    const tokenHash = this.cryptoUtil.hashToken(rawRefresh);
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + config.auth.refreshTokenTtlDays);
+
+    await this.refreshTokenRepository.create({
+      userId: user.id,
+      tokenHash,
+      familyId: sessionFamilyId,
+      expiresAt,
+    });
+
+    res.cookie(config.auth.refreshCookieName, rawRefresh, this.cookieOptions());
+
+    const accessToken = this.jwtUtil.signAccessToken({
+      userId: user.id,
+      sessionFamilyId,
+      tokenVersion: user.tokenVersion,
+    });
+
+    return { accessToken, user: this.toPublicUser(user) };
+  }
+
+  async register(
     email: string,
     password: string,
-    role: RoleType = ROLES.TEAM_MEMBER,
     name: string,
-    brands: string[] = [], // Default to an empty array
+    res: Response,
   ) {
-    // const hashedPassword = await bcrypt.hash(password, 10);
-    // Run hashing and brand fetching in parallel for optimization
-    const [hashedPassword, brandEntities] = await Promise.all([
-      bcrypt.hash(password, 10), // Hashing password in parallel
-      brands.length > 0
-        ? brandRepository.findBy({ id: In(brands) })
-        : Promise.resolve([]), // Fetch brands if needed
-    ]);
-    const user = userRepository.create({
-      email,
-      password: hashedPassword,
-      role,
-      name,
-      brands: brandEntities.length > 0 ? brandEntities : undefined, // Assign brands if found
-    });
-    await userRepository.save(user);
-    const token = generateToken(user.id, user.role);
-    return { token, userId: user.id, role: user.role, brands: user.brands };
-  }
-
-  // Login ----------------------------------------------------------------------------
-  static async login(email: string, password: string) {
-    const user = await userRepository.findOne({ where: { email } });
-    if (!user || !(await bcrypt.compare(password, user.password))) {
-      throw new Error("Invalid credentials");
+    const existing = await this.userRepository.findByEmail(email);
+    if (existing) {
+      throw new AppError({
+        message: "Registration failed",
+        statusCode: 400,
+        code: "REGISTRATION_FAILED",
+      });
     }
-    const token = generateToken(user.id, user.role);
-    return { token, userId: user.id, role: user.role };
+
+    const passwordHash = await this.cryptoUtil.hashPassword(password);
+    const user = await this.userRepository.createUser({
+      email,
+      passwordHash,
+      name,
+      status: USER_STATUS.ACTIVE,
+    });
+
+    return this.issueSession(user, res);
   }
 
-  // Reset password Request -----------------------------------------------------------------------
-  static async resetPasswordRequest(email: string) {
-    const user = await userRepository.findOne({ where: { email } });
-    if (!user) throw new Error("User not found");
+  async login(email: string, password: string, res: Response) {
+    const user = await this.userRepository.findByEmail(email);
+    if (
+      !user ||
+      user.status === USER_STATUS.SUSPENDED ||
+      user.status === USER_STATUS.PENDING
+    ) {
+      throw new AppError({
+        message: "Invalid credentials",
+        statusCode: 401,
+        code: "INVALID_CREDENTIALS",
+      });
+    }
 
-    const resetToken = generateToken(user.id, user.role);
-    user.resetToken = resetToken;
-    await userRepository.save(user);
+    const valid = await this.cryptoUtil.verifyPassword(
+      user.passwordHash,
+      password,
+    );
+    if (!valid) {
+      throw new AppError({
+        message: "Invalid credentials",
+        statusCode: 401,
+        code: "INVALID_CREDENTIALS",
+      });
+    }
 
-    await sendResetEmail(email, resetToken);
+    return this.issueSession(user, res);
   }
 
-  static async resetPasswordConfirm(
+  async refresh(rawRefreshToken: string | undefined, res: Response) {
+    if (!rawRefreshToken) {
+      throw new AppError({
+        message: "Unauthorized",
+        statusCode: 401,
+        code: "UNAUTHORIZED",
+      });
+    }
+
+    const tokenHash = this.cryptoUtil.hashToken(rawRefreshToken);
+    const stored = await this.refreshTokenRepository.findByHash(tokenHash);
+
+    if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
+      if (stored?.familyId) {
+        await this.refreshTokenRepository.revokeFamily(stored.familyId);
+      }
+      res.clearCookie(config.auth.refreshCookieName, this.cookieOptions());
+      throw new AppError({
+        message: "Unauthorized",
+        statusCode: 401,
+        code: "UNAUTHORIZED",
+      });
+    }
+
+    const user = await this.userRepository.findById(stored.userId);
+    if (!user || user.status === USER_STATUS.SUSPENDED) {
+      await this.refreshTokenRepository.revokeFamily(stored.familyId);
+      res.clearCookie(config.auth.refreshCookieName, this.cookieOptions());
+      throw new AppError({
+        message: "Unauthorized",
+        statusCode: 401,
+        code: "UNAUTHORIZED",
+      });
+    }
+
+    const newRaw = this.cryptoUtil.generateOpaqueToken();
+    const newHash = this.cryptoUtil.hashToken(newRaw);
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + config.auth.refreshTokenTtlDays);
+
+    await this.refreshTokenRepository.rotateToken(stored.id, {
+      userId: user.id,
+      tokenHash: newHash,
+      familyId: stored.familyId,
+      expiresAt,
+    });
+
+    res.cookie(config.auth.refreshCookieName, newRaw, this.cookieOptions());
+
+    const accessToken = this.jwtUtil.signAccessToken({
+      userId: user.id,
+      sessionFamilyId: stored.familyId,
+      tokenVersion: user.tokenVersion,
+    });
+
+    return { accessToken, user: this.toPublicUser(user) };
+  }
+
+  async logout(rawRefreshToken: string | undefined, res: Response) {
+    if (rawRefreshToken) {
+      const tokenHash = this.cryptoUtil.hashToken(rawRefreshToken);
+      const stored = await this.refreshTokenRepository.findByHash(tokenHash);
+      if (stored?.familyId) {
+        await this.refreshTokenRepository.revokeFamily(stored.familyId);
+      }
+    }
+    res.clearCookie(config.auth.refreshCookieName, this.cookieOptions());
+  }
+
+  async logoutAll(userId: string, res: Response) {
+    await this.userRepository.incrementTokenVersion(userId);
+    await this.refreshTokenRepository.revokeAllForUser(userId);
+    res.clearCookie(config.auth.refreshCookieName, this.cookieOptions());
+  }
+
+  async getMe(userId: string): Promise<PublicUserProfile> {
+    const user = await this.userRepository.findById(userId);
+    if (!user) {
+      throw new AppError({
+        message: "User not found",
+        statusCode: 404,
+        code: "USER_NOT_FOUND",
+      });
+    }
+    return this.toPublicUser(user);
+  }
+
+  async resetPasswordRequest(email: string): Promise<void> {
+    const user = await this.userRepository.findByEmail(email);
+    if (!user) return;
+
+    const token = this.cryptoUtil.generateOpaqueToken();
+    await this.userRepository.setResetToken(user.id, token);
+    await this.emailService.sendResetEmail(email, token);
+  }
+
+  async resetPasswordConfirm(
     token: string,
     newPassword: string,
     confirmPassword: string,
-  ) {
+  ): Promise<void> {
     if (newPassword !== confirmPassword) {
-      throw new Error("Passwords do not match");
+      throw new AppError({
+        message: "Passwords do not match",
+        statusCode: 400,
+        code: "PASSWORD_MISMATCH",
+      });
     }
-    const user = await userRepository.findOne({ where: { resetToken: token } });
-    if (!user) throw new Error("Invalid token");
 
-    user.password = await bcrypt.hash(newPassword, 10);
-    user.resetToken = "";
-    await userRepository.save(user);
-  }
-
-  // Get specific user details -------------------------------------------------------------
-  static async getUserDetails(userId: string) {
-    return await userRepository.findOne({
-      where: { id: userId },
-      select: ["id", "email", "role", "name", "brands"],
-      relations: ["brands"],
-    });
-  }
-
-  // Get all users - for Admin use --------------------------------------------
-  static async getAllUsers() {
-    return await userRepository
-      .createQueryBuilder("user")
-      .leftJoinAndSelect("user.pod", "pod") // Join the pod relation
-      .select([
-        "user.id",
-        "user.email",
-        "user.role",
-        "user.name",
-        "pod.id",
-        "pod.name",
-      ])
-      .orderBy("user.name", "ASC") // Sort by name in ascending order
-      .getMany();
-  }
-
-  // Get all employees - for Admin use -------------------------------------------
-  static async getAllEmployees() {
-    return await userRepository
-      .createQueryBuilder("user")
-      .leftJoinAndSelect("user.pod", "pod") // Join the pod relation
-      .select([
-        "user.id",
-        "user.email",
-        "user.role",
-        "user.name",
-        "pod.id",
-        "pod.name",
-      ])
-      .where("user.role != :clientRole", { clientRole: ROLES.CLIENT }) // Exclude clients
-      .orderBy("user.name", "ASC") // Sort by name in ascending order
-      .getMany();
-  }
-
-  // Update role for a specific user - for Admin use ------------------------------------
-  static async updateUserData(
-    userId: string,
-    role: string,
-    name: string,
-    brands: string[] = [], // Default to an empty array
-  ): Promise<User | null> {
-    const [user, brandEntities] = await Promise.all([
-      userRepository.findOne({
-        where: { id: userId },
-        select: ["id", "name", "email", "role"],
-        relations: ["brands"], // Ensure brands relation is loaded
-      }),
-      brands.length > 0
-        ? brandRepository.find({
-            where: { id: In(brands) },
-          })
-        : Promise.resolve([]),
-    ]);
-    console.log(brandEntities);
-
+    const user = await this.userRepository.findByResetToken(token);
     if (!user) {
-      return null; // User not found
+      throw new AppError({
+        message: "Invalid or expired reset token",
+        statusCode: 400,
+        code: "INVALID_RESET_TOKEN",
+      });
     }
 
-    user.role = role as RoleType;
-    user.name = name;
-    user.brands = brandEntities; // If no brands found, assign an empty array
-
-    await userRepository.save(user);
-    return user;
-  }
-
-  // Delete user - admin access
-  static async deleteUser(userId: string) {
-    await userRepository.delete(userId);
+    const passwordHash = await this.cryptoUtil.hashPassword(newPassword);
+    const activate = user.status === USER_STATUS.PENDING;
+    await this.userRepository.updatePasswordAndActivate(
+      user.id,
+      passwordHash,
+      activate,
+    );
   }
 }

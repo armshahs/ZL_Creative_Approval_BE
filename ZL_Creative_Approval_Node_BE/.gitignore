@@ -133,6 +133,9 @@ dist
 media_ai
 # data_uploads
 
+# tech specs
+tech_specs
+
 # markdown files
 SECURITY.md
 DEVELOPMENT_GUIDELINES.md

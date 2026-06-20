@@ -1,54 +1,56 @@
 import express from "express";
 import { AuthController } from "../controllers";
-import { authenticateJWT, authorizeRole } from "../middleware";
-import { ROLES } from "../config";
+import { container } from "../container";
+import {
+  validateBody,
+  registerSchema,
+  loginSchema,
+  resetPasswordSchema,
+  resetPasswordConfirmSchema,
+} from "../validations";
 
 const router = express.Router();
+const authController = new AuthController();
+const { authenticateMiddleware, loadPermissionsMiddleware, authRateLimiterMiddleware } =
+  container;
 
-router.post("/signup-admin", AuthController.signUp);
-// Always add authenticateJWT before authorizeRole or else it will not get req.user
+const authChain = [
+  authenticateMiddleware.handle,
+  loadPermissionsMiddleware.handle,
+];
+
 router.post(
-  "/signup",
-  authenticateJWT,
-  authorizeRole([ROLES.ADMIN]),
-  AuthController.signUp,
+  "/register",
+  authRateLimiterMiddleware.handle,
+  validateBody(registerSchema),
+  authController.register,
 );
-router.post("/login", AuthController.login);
-// Reset password for sending email, reset password-confirm for changing password.
-router.post("/reset-password", AuthController.resetPasswordRequest);
-router.post("/reset-password-confirm", AuthController.resetPasswordConfirm);
-// --------------------------------------------------------
-// --------------------------------------------------------
-// Get my details
-router.get("/me", authenticateJWT, AuthController.getMyDetails);
-// Get all Users - admin access only
-router.get(
-  "/users",
-  authenticateJWT,
-  authorizeRole([ROLES.ADMIN]),
-  AuthController.getAllUsers,
+router.post(
+  "/login",
+  authRateLimiterMiddleware.handle,
+  validateBody(loginSchema),
+  authController.login,
 );
-// Get all Employees - admin access only
-router.get(
-  "/employees",
-  authenticateJWT,
-  authorizeRole([ROLES.ADMIN]),
-  AuthController.getAllEmployees,
+router.post(
+  "/refresh",
+  authRateLimiterMiddleware.handle,
+  authController.refresh,
 );
-// Get a sepecific used details - Admin access
-router.get(
-  "/users/:id",
-  authenticateJWT,
-  authorizeRole([ROLES.ADMIN]),
-  AuthController.getUserDetails,
+router.post("/logout", authController.logout);
+router.post("/logout-all", ...authChain, authController.logoutAll);
+router.get("/me", ...authChain, authController.me);
+router.post(
+  "/reset-password",
+  authRateLimiterMiddleware.handle,
+  validateBody(resetPasswordSchema),
+  authController.resetPasswordRequest,
 );
-
-// update specific user details
-router.patch(
-  "/users/:id/update",
-  authenticateJWT,
-  authorizeRole([ROLES.ADMIN]),
-  AuthController.updateUserData,
+router.post(
+  "/reset-password-confirm",
+  authRateLimiterMiddleware.handle,
+  validateBody(resetPasswordConfirmSchema),
+  authController.resetPasswordConfirm,
 );
+router.post("/mfa/enroll", ...authChain, authController.mfaEnroll);
 
 export default router;
