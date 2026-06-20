@@ -21,8 +21,30 @@ app.use(helmet());
 
 app.use(
   cors({
-    origin: config.cors.allowedOrigins,
-    credentials: true,
+    origin:
+      config.server.nodeEnv === "production"
+        ? [
+            "http://170.64.134.212", // Production Frontend IP
+            "https://170.64.134.212", // Production Frontend IP
+            "http://analytics.bluesensedigital.com.au",
+            "https://analytics.bluesensedigital.com.au",
+            "http://www.analytics.bluesensedigital.com.au",
+            "https://www.analytics.bluesensedigital.com.au",
+            "http://localhost:3039",
+            "http://localhost:3000",
+          ]
+        : [
+            "http://localhost:3000",
+            "http://localhost:8000",
+            "http://localhost:8001",
+            "http://localhost:5173",
+            "http://localhost:8080",
+            "http://127.0.0.1:8000",
+            "http://localhost:80",
+            "http://localhost",
+            "http://localhost:3039",
+          ],
+    credentials: true, // Required if you're using cookies, sessions, or Authorization headers
     methods: [
       "GET",
       "POST",
@@ -31,31 +53,37 @@ app.use(
       "HEAD",
       "DELETE",
       "OPTIONS",
-    ],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Api-Key"],
+      "TRACE",
+      "CONNECT",
+    ], // Methods to allow in the request
+    allowedHeaders: ["Content-Type", "Authorization", "X-Api-Key"], // Headers to allow in the request
     exposedHeaders: [
       "RateLimit-Limit",
       "RateLimit-Remaining",
       "RateLimit-Reset",
-    ],
+    ], // Headers to expose in the response that can be read by the client
   }),
 );
 
 const limiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
-  max: 250,
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 250, // Limit each IP to 250 requests per windowMs
   message: "Too many requests from this IP, please try again after 1 minute",
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: (req) => req.method === "OPTIONS",
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  skip: (req) => req.method === "OPTIONS", // needed because OPTIONS requests are used for CORS preflight
 });
 
+// Apply rate limiting to all routes
 app.use(limiter);
 app.use(compression());
-app.use(cookieParser());
+app.use(cookieParser()); // Parse cookies from the request for JWT refresh token.
+
+// JSON request body parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Routes
 app.use("/saas/api/v1/auth", authRoutes);
 app.use("/saas/api/v1/workspaces", workspacesRoutes);
 app.use("/saas/api/v1", dashboardsRoutes);
@@ -68,6 +96,7 @@ app.get("/saas/api/v1/test", (req: Request, res: Response) => {
   });
 });
 app.get("/saas/api/v1/test2", (req: Request, res: Response) => {
+  // throw new Error("Oops");
   logger.error("Entity not found 3");
   logger
     .child({
@@ -84,6 +113,7 @@ app.get("/saas/api/v1/test2", (req: Request, res: Response) => {
   });
 });
 
+// Error handling  (should be last middleware to process requests)
 app.use(errorHandler);
 
 export default app;

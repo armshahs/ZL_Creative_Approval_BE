@@ -4,29 +4,16 @@ dotenv.config();
 
 const isProduction = process.env.NODE_ENV === "production";
 
+// Used for JWT auth.
+// decodePemFromEnv turns base64-encoded PEM strings from environment variables back into the actual RSA key text the app needs for JWT auth.
 function decodePemFromEnv(value: string): string {
   if (!value) return "";
   return Buffer.from(value, "base64").toString("utf-8");
 }
 
-function parseCorsOrigins(): string[] {
-  const raw = process.env.CORS_ALLOWED_ORIGINS || "";
-  if (!raw.trim()) {
-    return isProduction
-      ? []
-      : [
-          "http://localhost:3000",
-          "http://localhost:5173",
-          "http://localhost:3039",
-          "http://127.0.0.1:3000",
-        ];
-  }
-  return raw.split(",").map((o) => o.trim()).filter(Boolean);
-}
-
 export const config = {
   database: {
-    type: "postgres" as const,
+    type: "postgres",
     host: process.env.DB_HOST || "localhost",
     port: parseInt(process.env.DB_PORT || "5432", 10),
     username: process.env.DB_USER || "postgres",
@@ -34,16 +21,16 @@ export const config = {
     database: process.env.DB_NAME || "mydb",
     synchronize: false,
     logging: false,
-    entities: [isProduction ? "dist/models/*.js" : "src/models/*.ts"],
+    entities: [isProduction ? "dist/models/*.js" : "src/models/*.ts"], // Path to your entity files
     migrations: [
       isProduction
         ? "dist/database/migrations/**/*.js"
         : "src/database/migrations/**/*.ts",
-    ],
-    subscribers: [] as string[],
-    poolSize: parseInt(process.env.DATABASE_POOL_MAX || "20", 10),
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
+    ], // Path to your migration files
+    subscribers: [],
+    poolSize: 20, // Set a connection pool size
+    idleTimeoutMillis: 30000, // 30 seconds of inactivity before closing the connection
+    connectionTimeoutMillis: 5000, // 5 seconds to establish a connection
   },
   server: {
     port: parseInt(process.env.PORT || "3000", 10),
@@ -52,8 +39,10 @@ export const config = {
   },
   logging: {
     logLevel: process.env.LOG_LEVEL || "error",
-    logtailToken: process.env.LOGTAIL_TOKEN || "",
-    logtailEndpoint: process.env.LOGTAIL_INGESTION_ENDPOINT || "",
+    logtailToken: process.env.LOGTAIL_TOKEN || "Pvm9CYft2mcKfQFnCnm7fJGn",
+    logtailEndpoint:
+      process.env.LOGTAIL_INGESTION_ENDPOINT ||
+      "https://s1194431.eu-nbg-2.betterstackdata.com/",
   },
   auth: {
     jwtPrivateKey: decodePemFromEnv(process.env.JWT_PRIVATE_KEY || ""),
@@ -69,19 +58,16 @@ export const config = {
       10,
     ),
   },
-  cors: {
-    allowedOrigins: parseCorsOrigins(),
-  },
   email: {
-    emailUser: process.env.EMAIL_USER || "",
-    emailPassword: process.env.EMAIL_PASSWORD || "",
-    emailClientUrl: process.env.EMAIL_CLIENT_URL || "",
-    sendgridSenderEmail: process.env.SENDGRID_EMAIL_USER_VERIFIED || "",
-    sendgridApiKey: process.env.SENDGRID_EMAIL_API_KEY || "",
+    emailUser: process.env.EMAIL_USER || "", // IGNORE - using gmail smtp server
+    emailPassword: process.env.EMAIL_PASSWORD || "", // IGNORE - using gmail smtp server
+    emailClientUrl: process.env.EMAIL_CLIENT_URL || "", // url for the email client
+    sendgridSenderEmail: process.env.SENDGRID_EMAIL_USER_VERIFIED || "", // sendgrid sender email verified
+    sendgridApiKey: process.env.SENDGRID_EMAIL_API_KEY || "", // sendgrid api key for sending emails
   },
   redis: {
     host: process.env.REDIS_HOST || "localhost",
-    port: parseInt(process.env.REDIS_PORT || "6379", 10),
+    port: parseInt(process.env.REDIS_PORT || "6379"),
     password: process.env.REDIS_PASSWORD,
   },
   slack: {
