@@ -19,22 +19,22 @@ const { authenticateMiddleware, loadPermissionsMiddleware, guardsMiddleware } =
   container;
 
 const authChain = [
-  authenticateMiddleware.handle,
-  loadPermissionsMiddleware.handle,
+  authenticateMiddleware.handle, // verifies the user is logged in (typically via JWT/session).
+  loadPermissionsMiddleware.handle, //  loads the user's permissions into req.permissions so later guards can check access
 ];
 
 router.get(
   "/workspaces/:wsId/dashboards",
-  ...authChain,
-  validateParams(workspaceIdParamSchema),
+  ...authChain, // verified JWT and loads user permissions.
+  validateParams(workspaceIdParamSchema), // validated url parameter with Zod
   dashboardController.listByWorkspace,
 );
 router.post(
   "/workspaces/:wsId/dashboards",
-  ...authChain,
-  validateParams(workspaceIdParamSchema),
-  validateBody(createDashboardSchema),
-  guardsMiddleware.requireWorkspaceAdmin((req) => req.params.wsId),
+  ...authChain, // verified JWT and loads user permissions.
+  validateParams(workspaceIdParamSchema), // validated url parameter with Zod
+  validateBody(createDashboardSchema), // validates request body with Zod
+  guardsMiddleware.requireWorkspaceAdmin((req) => req.params.wsId), // authorization guard for admin, team, client etc.
   dashboardController.create,
 );
 

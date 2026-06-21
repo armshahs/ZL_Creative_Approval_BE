@@ -5,11 +5,8 @@ import { validateParams, uuidParamSchema } from "../validations";
 
 const router = express.Router();
 const superadminController = new SuperadminController();
-const {
-  authenticateMiddleware,
-  loadPermissionsMiddleware,
-  guardsMiddleware,
-} = container;
+const { authenticateMiddleware, loadPermissionsMiddleware, guardsMiddleware } =
+  container;
 
 const superadminChain = [
   authenticateMiddleware.handle,
@@ -17,7 +14,11 @@ const superadminChain = [
   guardsMiddleware.requireSuperadmin,
 ];
 
-router.get("/workspaces", ...superadminChain, superadminController.listWorkspaces);
+router.get(
+  "/workspaces",
+  ...superadminChain,
+  superadminController.listWorkspaces,
+);
 router.get("/users", ...superadminChain, superadminController.listUsers);
 router.post(
   "/users/:id/grant-superadmin",

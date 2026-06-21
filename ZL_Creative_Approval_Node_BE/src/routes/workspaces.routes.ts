@@ -14,11 +14,8 @@ import {
 
 const router = express.Router();
 const workspaceController = new WorkspaceController();
-const {
-  authenticateMiddleware,
-  loadPermissionsMiddleware,
-  guardsMiddleware,
-} = container;
+const { authenticateMiddleware, loadPermissionsMiddleware, guardsMiddleware } =
+  container;
 
 const authChain = [
   authenticateMiddleware.handle,

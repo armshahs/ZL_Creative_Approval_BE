@@ -25,8 +25,7 @@ import { LoadPermissionsMiddleware } from "./middleware/loadPermissions.middlewa
 import { GuardsMiddleware } from "./middleware/guards.middleware";
 import { AuthRateLimiterMiddleware } from "./middleware/authRateLimiter.middleware";
 
-
-// container.ts is the composition root for the Auth/RBAC system — a single place 
+// container.ts is the composition root for the Auth/RBAC system — a single place
 // where all dependencies are instantiated once and wired together.
 class Container {
   readonly cryptoUtil = new CryptoUtil();
@@ -36,8 +35,12 @@ class Container {
   readonly userRepository = new UserRepository(AppDataSource);
   readonly workspaceRepository = new WorkspaceRepository(AppDataSource);
   readonly dashboardRepository = new DashboardRepository(AppDataSource);
-  readonly workspaceAdminRepository = new WorkspaceAdminRepository(AppDataSource);
-  readonly dashboardAccessRepository = new DashboardAccessRepository(AppDataSource);
+  readonly workspaceAdminRepository = new WorkspaceAdminRepository(
+    AppDataSource,
+  );
+  readonly dashboardAccessRepository = new DashboardAccessRepository(
+    AppDataSource,
+  );
   readonly refreshTokenRepository = new RefreshTokenRepository(AppDataSource);
   readonly loginAttemptRepository = new LoginAttemptRepository(AppDataSource);
   readonly systemSettingRepository = new SystemSettingRepository(AppDataSource);
