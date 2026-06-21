@@ -15,11 +15,8 @@ import {
 
 const router = express.Router();
 const dashboardController = new DashboardController();
-const {
-  authenticateMiddleware,
-  loadPermissionsMiddleware,
-  guardsMiddleware,
-} = container;
+const { authenticateMiddleware, loadPermissionsMiddleware, guardsMiddleware } =
+  container;
 
 const authChain = [
   authenticateMiddleware.handle,

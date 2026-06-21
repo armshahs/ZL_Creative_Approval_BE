@@ -5,9 +5,7 @@ import AppError from "../errors/custom-error";
 import { config } from "../config/config";
 
 export class AuthController {
-  constructor(
-    private readonly authService = container.authService,
-  ) {}
+  constructor(private readonly authService = container.authService) {}
 
   register = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -36,7 +34,9 @@ export class AuthController {
 
   refresh = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const raw = req.cookies?.[config.auth.refreshCookieName] as string | undefined;
+      const raw = req.cookies?.[config.auth.refreshCookieName] as
+        | string
+        | undefined;
       const result = await this.authService.refresh(raw, res);
       res.status(200).json(result);
     } catch (error) {
@@ -46,7 +46,9 @@ export class AuthController {
 
   logout = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const raw = req.cookies?.[config.auth.refreshCookieName] as string | undefined;
+      const raw = req.cookies?.[config.auth.refreshCookieName] as
+        | string
+        | undefined;
       await this.authService.logout(raw, res);
       res.status(204).send();
     } catch (error) {

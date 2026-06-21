@@ -11,8 +11,11 @@ import {
 
 const router = express.Router();
 const authController = new AuthController();
-const { authenticateMiddleware, loadPermissionsMiddleware, authRateLimiterMiddleware } =
-  container;
+const {
+  authenticateMiddleware,
+  loadPermissionsMiddleware,
+  authRateLimiterMiddleware,
+} = container;
 
 const authChain = [
   authenticateMiddleware.handle,

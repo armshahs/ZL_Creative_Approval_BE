@@ -16,6 +16,6 @@ export class Workspace extends BaseModel {
   @Column({ type: "timestamp", nullable: true })
   deletedAt?: Date | null;
 
-  @OneToMany(() => Dashboard, (dashboard) => dashboard.workspace)
+  @OneToMany(() => Dashboard, (dashboard: Dashboard) => dashboard.workspace)
   dashboards?: Dashboard[];
 }

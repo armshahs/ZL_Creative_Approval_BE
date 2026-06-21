@@ -25,6 +25,9 @@ import { LoadPermissionsMiddleware } from "./middleware/loadPermissions.middlewa
 import { GuardsMiddleware } from "./middleware/guards.middleware";
 import { AuthRateLimiterMiddleware } from "./middleware/authRateLimiter.middleware";
 
+
+// container.ts is the composition root for the Auth/RBAC system — a single place 
+// where all dependencies are instantiated once and wired together.
 class Container {
   readonly cryptoUtil = new CryptoUtil();
   readonly jwtUtil = new JwtUtil();

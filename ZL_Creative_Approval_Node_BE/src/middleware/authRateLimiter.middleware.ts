@@ -4,7 +4,9 @@ import { config } from "../config/config";
 import AppError from "../errors/custom-error";
 
 export class AuthRateLimiterMiddleware {
-  constructor(private readonly loginAttemptRepository: LoginAttemptRepository) {}
+  constructor(
+    private readonly loginAttemptRepository: LoginAttemptRepository,
+  ) {}
 
   handle = async (
     req: Request,

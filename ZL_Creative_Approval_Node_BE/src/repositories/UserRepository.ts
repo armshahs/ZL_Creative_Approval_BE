@@ -74,7 +74,10 @@ export class UserRepository extends BaseRepository {
     await this.getRepo(User).update({ id: userId }, { resetToken: null });
   }
 
-  async updatePasswordHash(userId: string, passwordHash: string): Promise<void> {
+  async updatePasswordHash(
+    userId: string,
+    passwordHash: string,
+  ): Promise<void> {
     await this.getRepo(User).update({ id: userId }, { passwordHash });
   }
 

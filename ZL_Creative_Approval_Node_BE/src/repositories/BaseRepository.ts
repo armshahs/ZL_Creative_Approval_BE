@@ -7,7 +7,9 @@ export abstract class BaseRepository {
     return this.dataSource.getRepository(entity);
   }
 
-  async withTransaction<T>(fn: (manager: EntityManager) => Promise<T>): Promise<T> {
+  async withTransaction<T>(
+    fn: (manager: EntityManager) => Promise<T>,
+  ): Promise<T> {
     return this.dataSource.transaction(fn);
   }
 }
